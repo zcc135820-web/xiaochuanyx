@@ -2,43 +2,67 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import os
+from ipaddress import ip_address
 
-# 目标URL列表
-urls = ['https://monitor.gacjie.cn/page/cloudflare/ipv4.html', 
-        'https://ip.164746.xyz'
-        ]
+def is_valid_ip(ip):
+    """检查IP地址是否有效"""
+    try:
+        ip_address(ip)
+        return True
+    except ValueError:
+        return False
 
-# 正则表达式用于匹配IP地址
-ip_pattern = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
-
-# 检查ip.txt文件是否存在,如果存在则删除它
-if os.path.exists('ip.txt'):
-    os.remove('ip.txt')
-
-# 创建一个文件来存储IP地址
-with open('ip.txt', 'w') as file:
-    for url in urls:
-        # 发送HTTP请求获取网页内容
-        response = requests.get(url)
-        
-        # 使用BeautifulSoup解析HTML
+def fetch_ips_from_url(url, tag):
+    """从指定URL提取IP地址"""
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # 检查请求是否成功
         soup = BeautifulSoup(response.text, 'html.parser')
+        elements = soup.find_all(tag)
+        ips = set()
         
-        # 根据网站的不同结构找到包含IP地址的元素
-        if url == 'https://monitor.gacjie.cn/page/cloudflare/ipv4.html':
-            elements = soup.find_all('tr')
-        elif url == 'https://ip.164746.xyz':
-            elements = soup.find_all('tr')
-        else:
-            elements = soup.find_all('li')
-        
-        # 遍历所有元素,查找IP地址
         for element in elements:
-            element_text = element.get_text()
-            ip_matches = re.findall(ip_pattern, element_text)
-            
-            # 如果找到IP地址,则写入文件
+            ip_matches = re.findall(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', element.get_text())
             for ip in ip_matches:
-                file.write(ip + '\n')
+                if is_valid_ip(ip):
+                    ips.add(ip)
+        return ips
+    except requests.RequestException as e:
+        print(f"请求失败: {url}, 错误: {e}")
+        return set()
+    except Exception as e:
+        print(f"解析错误: {url}, 错误: {e}")
+        return set()
 
-print('IP地址已保存到ip.txt文件中。')
+def save_ips_to_file(ips, filename):
+    """将IP地址保存到文件"""
+    with open(filename, 'w') as file:
+        for ip in ips:
+            file.write(ip + '\n')
+
+def main():
+    # 目标URL及其对应的HTML标签
+    urls = {
+        'https://monitor.gacjie.cn/page/cloudflare/ipv4.html': 'tr',
+        'https://ip.164746.xyz': 'tr',
+    }
+
+    unique_ips = set()
+
+    # 从每个URL提取IP地址
+    for url, tag in urls.items():
+        print(f"正在处理: {url}")
+        ips = fetch_ips_from_url(url, tag)
+        unique_ips.update(ips)
+
+    # 保存到文件
+    output_file = 'chuan.txt'
+    if os.path.exists(output_file):
+        os.remove(output_file)
+    
+    save_ips_to_file(unique_ips, output_file)
+    print(f"共保存 {len(unique_ips)} 个唯一IP地址到 {output_file}")
+
+if __name__ == "__main__":
+    main()
+

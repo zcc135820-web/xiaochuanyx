@@ -45,6 +45,7 @@ def main():
     urls = {
         'https://monitor.gacjie.cn/page/cloudflare/ipv4.html': 'tr',
         'https://ip.164746.xyz': 'tr',
+        'https://www.wetest.vip/page/cloudfront/address_v6.html': 'tr',
     }
 
     unique_ips = set()
